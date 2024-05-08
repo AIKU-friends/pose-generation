@@ -5,6 +5,8 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 
+from config import Config
+
 class SitcomPoseDataset(Dataset):
     def __init__(self, data_path, data_list, cfg):
 
@@ -15,6 +17,7 @@ class SitcomPoseDataset(Dataset):
         ])
 
         self.target_point_method = cfg.target_point_method
+        self.data_tag = cfg.data_tag
 
         self.data_path = data_path
         self.image_dir_path = os.path.join(self.data_path, 'data')
@@ -51,7 +54,7 @@ class SitcomPoseDataset(Dataset):
     def preprocess(self, data_list):
 
         cluster_keypoints_list = []
-        with open(os.path.join(self.data_path, 'centers_30.txt'), 'r') as f:
+        with open(os.path.join(self.data_path, f'centers_30{self.data_tag}.txt'), 'r') as f:
             cluster_data_list = list(f.readlines())
         for cluster_data in cluster_data_list:
             cluster_data = cluster_data.split(' ')[:-1]

@@ -9,9 +9,10 @@ class Config:
         self.fc_dim = 512
         self.latent_dim = 30
         self.sd_dim = 34
-        self.class_weight = [0.1882, 1.01616, 0.39219, 0.41017, 1.03255, 0.24806, 0.66632, 0.45527, 2.21929, 3.7488, 1.38706, 0.87419, 2.96168, 2.4992, 0.35841, 3.43898, 20.29837, 3.80015, 3.07097, 9.90754, 0.55855, 2.18434, 9.35094, 25.21919, 9.24704, 6.45142, 21.33932, 7.70586, 41.61167, 52.01458]
+        self.class_weight = [2.74664, 0.99431, 1.12161, 1.60353, 1.97212, 0.97565, 1.65784, 1.85766, 1.24029, 1.90442, 1.1788, 1.46778, 0.63529, 0.58117, 2.16727, 1.46006, 0.43825, 1.11113, 0.38999, 1.14633, 0.79716, 0.80799, 2.01998, 1.51867, 1.08789, 0.97565, 0.47692, 1.44736, 1.63183, 0.65324]
 
-        self.target_point_method = 'center' # ['mean', 'center', keypoint_index]
+        self.target_point_method = 'mean' # ['mean', 'center', keypoint_index]
+        self.data_tag = '_kmeans_1'
 
         self.num_epochs = 100
         self.validation_term = 1
@@ -27,7 +28,7 @@ class Config:
 
         self.backbone_freeze = False
 
-        self.checkpoint_dir = 'checkpoints/experiment20'
+        self.checkpoint_dir = 'checkpoints/experiment22'
         if not os.path.exists('checkpoints'):
             os.mkdir('checkpoints')
         if not os.path.exists(self.checkpoint_dir):

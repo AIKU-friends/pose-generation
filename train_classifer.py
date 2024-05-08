@@ -124,12 +124,12 @@ def train():
     data_path = './affordance_data'
     data_list = []
 
-    with open(os.path.join(data_path, 'trainlist.txt'), 'r') as f:
+    with open(os.path.join(data_path, f'trainlist{cfg.data_tag}.txt'), 'r') as f:
         data_list = list(f.readlines())
     train_dataset = SitcomPoseDataset(data_path, data_list, cfg)
     train_loader = DataLoader(train_dataset, batch_size=cfg.batch_size, shuffle=True)
 
-    with open(os.path.join(data_path, 'testlist.txt'), 'r') as f:
+    with open(os.path.join(data_path, f'testlist{cfg.data_tag}.txt'), 'r') as f:
         data_list = list(f.readlines())
     test_dataset = SitcomPoseDataset(data_path, data_list, cfg)
     test_loader = DataLoader(test_dataset, batch_size=cfg.batch_size, shuffle=False)
