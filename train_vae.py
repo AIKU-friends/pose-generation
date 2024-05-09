@@ -55,13 +55,15 @@ def train_epoch(epoch, model, criterion, optimizer, lr_scheduler, train_dataload
 
     return np.mean(losses)
 
-def eval_epoch(model, dataloader, criterion, cluster_keypoints_list, pck_threshold):
+def eval_epoch(model, dataloader, criterion, cluster_keypoints_list, pck_threshold, latent_dim):
     # - criterion: 검증 손실을 계산하는 데 사용되는 손실 함수
     model.eval()
     val_losses = []
     mse_losses = []
     mse_list = []
     pck_list = []
+    mse_latent_list = []
+    pck_latent_list = []
 
     with torch.no_grad():
         for i, batch in enumerate(dataloader):
@@ -88,8 +90,17 @@ def eval_epoch(model, dataloader, criterion, cluster_keypoints_list, pck_thresho
             pck = cal_PCK(generated_pose, pose_keypoints, pck_threshold)
             mse_list.append(mse)
             pck_list.append(pck)
-    
-    return np.mean(val_losses), np.mean(mse_losses), np.mean(mse_list), np.mean(pck_list)
+
+            latent_vector = torch.randn((scale_deformation.shape[0], latent_dim))
+            scale_deformation_recon = model.decoder(latent_vector.to(device), one_hot_pose_vector.to(device), img.to(device), img_crop.to(device), img_zoom.to(device))
+
+            generated_pose = generate_pose(base_pose, scale_deformation_recon[:, :2].to('cpu'), scale_deformation_recon[:, 2:].to('cpu'), target_point)
+            mse = cal_MSE(generated_pose, pose_keypoints)
+            pck = cal_PCK(generated_pose, pose_keypoints, pck_threshold)
+            mse_latent_list.append(mse)
+            pck_latent_list.append(pck)
+
+    return np.mean(val_losses), np.mean(mse_losses), np.mean(mse_list), np.mean(pck_list), np.mean(mse_latent_list), np.mean(pck_latent_list)
 
 def train():
 
@@ -148,9 +159,9 @@ def train():
 
         # validation step
         if num_epochs % cfg.validation_term == 0 and num_epochs != 0:
-            valid_loss, mse_loss, mse, pck = eval_epoch(model, test_loader, criterion, cluster_keypoints_list, cfg.pck_threshold)
-            wandb.log({"Validation Loss": valid_loss, "MSE Loss": mse_loss, "MSE": mse, f"PCK@{cfg.pck_threshold}": pck})
-            print(f'Validation Loss: {valid_loss:.3f}, MSE Loss: {mse_loss:.3f}, MSE: {mse:.3f}, PCK@{cfg.pck_threshold}: {pck:.3f}')
+            valid_loss, mse_loss, mse, pck, mse_l, pck_l = eval_epoch(model, test_loader, criterion, cluster_keypoints_list, cfg.pck_threshold, cfg.latent_dim)
+            wandb.log({"Validation Loss": valid_loss, "MSE Loss": mse_loss, "MSE": mse, f"PCK@{cfg.pck_threshold}": pck, "MSE_Latent": mse_l, f"PCK@{cfg.pck_threshold}_Latent": pck_l})
+            print(f'Validation Loss: {valid_loss:.3f}, MSE Loss: {mse_loss:.3f}, MSE: {mse:.3f}, PCK@{cfg.pck_threshold}: {pck:.3f}, MSE_Latent: {mse_l:.3f}, PCK@{cfg.pck_threshold}_Latent: {pck_l:.3f}')
 
             # validation 후 - model save
             torch.save(model.state_dict(), os.path.join(cfg.checkpoint_dir, f'model_{epoch}_{int(valid_loss)}_{int(mse_loss)}.pt'))
