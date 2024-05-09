@@ -14,9 +14,9 @@ class Config:
         self.target_point_method = 'mean' # ['mean', 'center', keypoint_index]
         self.data_tag = '_kmeans_2'
 
-        self.num_epochs = 100
+        self.num_epochs = 1000
         self.validation_term = 1
-        self.variational_beta = 10
+        self.variational_beta = 5
         self.learning_rate = 2e-4
         self.adam_beta1 = 0.5
         self.adam_beta2 = 0.999
