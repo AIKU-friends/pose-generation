@@ -17,7 +17,7 @@ class Config:
         self.num_epochs = 1000
         self.validation_term = 1
         self.variational_beta = 5
-        self.learning_rate = 1e-3
+        self.learning_rate = 4e-4
         self.adam_beta1 = 0.5
         self.adam_beta2 = 0.999
         self.weight_decay = 2e-5
