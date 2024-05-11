@@ -17,7 +17,7 @@ class Config:
         self.num_epochs = 1000
         self.validation_term = 1
         self.variational_beta = 10
-        self.learning_rate = 2e-4
+        self.learning_rate = 4e-4
         self.adam_beta1 = 0.5
         self.adam_beta2 = 0.999
         self.weight_decay = 2e-5
@@ -28,7 +28,7 @@ class Config:
 
         self.backbone_freeze = False
 
-        self.checkpoint_dir = 'checkpoints/experiment28'
+        self.checkpoint_dir = 'checkpoints/experiment29'
         if not os.path.exists('checkpoints'):
             os.mkdir('checkpoints')
         if not os.path.exists(self.checkpoint_dir):
