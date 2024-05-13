@@ -24,11 +24,65 @@ class AlexNetFc7(nn.Module):
             x = self.alexnet(x)
         return x
     
+class VGG16_fc(nn.Module):
+    def __init__(self, freeze):
+        super(VGG16_fc, self).__init__()
+        modules = list(models.vgg16(weights='IMAGENET1K_V1').children())[:-1]
+        modules.append(nn.Flatten())
+
+        self.vgg16 = nn.Sequential(*modules)
+        self.freeze = freeze
+
+    def forward(self, x):
+        if self.freeze:
+            with torch.no_grad():
+                x = self.vgg16(x)
+        else:
+            x = self.vgg16(x)
+
+        return x
+    
+class ResNet18_Upsampling(nn.Module):
+    def __init__(self, freeze):
+        super(ResNet18_Upsampling, self).__init__()
+        model = models.resnet18(weights='IMAGENET1K_V1')
+        modules = list(model.children())
+        self.sublayer1 = nn.Sequential(*modules[:-4])
+        self.sublayer2 = nn.Sequential(*modules[-4])
+        self.sublayer3 = nn.Sequential(*modules[-3])
+        self.upsample_layer = nn.Upsample(scale_factor=2, mode='bilinear')
+        self.projection_layer1 = nn.Conv2d(256, 512, 1)
+        self.projection_layer2 = nn.Conv2d(128, 512, 1)
+        self.projection_layer3 = nn.Conv2d(512, 128, 1)
+        self.flatten = nn.Flatten()
+        self.freeze = freeze
+
+    def forward(self, x):
+        if self.freeze:
+            with torch.no_grad():
+                feature1 = self.sublayer1(x)
+                feature2 = self.sublayer2(feature1)
+                feature3 = self.sublayer3(feature2)
+        else:
+            feature1 = self.sublayer1(x)
+            feature2 = self.sublayer2(feature1)
+            feature3 = self.sublayer3(feature2)
+        
+        x = self.upsample_layer(feature3) + self.projection_layer1(feature2)
+        x = self.upsample_layer(x) + self.projection_layer2(feature1)
+        x = self.flatten(self.projection_layer3(x))
+        return x
+    
 class PoseClassifier(nn.Module):
     def __init__(self, cfg):
         super(PoseClassifier, self).__init__()
-        self.fc7 = AlexNetFc7(cfg.backbone_freeze)
-        self.fc = nn.Linear(3*cfg.alexnet_fc7_dim, cfg.pose_dim)
+        if cfg.backbone == 'AlexNet':
+            self.fc7 = AlexNetFc7(cfg.backbone_freeze)
+        if cfg.backbone == 'VGG':
+            self.fc7 = VGG16_fc(cfg.backbone_freeze)
+        if cfg.backbone == 'ResNetUp':
+            self.fc7 = ResNet18_Upsampling(cfg.backbone_freeze)
+        self.fc = nn.Linear(3*cfg.backbone_feature_dim, cfg.pose_dim)
 
     def forward(self, x, x_crop, x_zoom):
         x = self.fc7(x)
@@ -43,15 +97,21 @@ class ConditionEncoder(nn.Module):
     def __init__(self, cfg):
         super(ConditionEncoder, self).__init__()
 
-        self.alexnet = AlexNetFc7(cfg.backbone_freeze)
+        if cfg.backbone == 'AlexNet':
+            self.backbone = AlexNetFc7(cfg.backbone_freeze)
+        if cfg.backbone == 'VGG':
+            self.backbone = VGG16_fc(cfg.backbone_freeze)
+        if cfg.backbone == 'ResNetUp':
+            self.backbone = ResNet18_Upsampling(cfg.backbone_freeze)
+
         self.fc1 = nn.Linear(in_features=cfg.pose_dim, out_features=cfg.fc_dim)
-        self.fc2 = nn.Linear(in_features=cfg.fc_dim + 3*cfg.alexnet_fc7_dim, out_features=cfg.fc_dim)
+        self.fc2 = nn.Linear(in_features=cfg.fc_dim + 3*cfg.backbone_feature_dim, out_features=cfg.fc_dim)
 
     def forward(self, pose, img, img_crop, img_zoom):
         pose = F.relu(self.fc1(pose))
-        img = self.alexnet(img)
-        img_crop = self.alexnet(img_crop)
-        img_zoom = self.alexnet(img_zoom)
+        img = self.backbone(img)
+        img_crop = self.backbone(img_crop)
+        img_zoom = self.backbone(img_zoom)
 
         output = torch.cat((pose, img, img_crop, img_zoom), dim=1)
         output = F.relu(self.fc2(output))
