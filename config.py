@@ -3,7 +3,7 @@ import os
 class Config:
     def __init__(self):
         
-        self.backbone = 'VGG' # ['AlexNet', 'VGG', 'ResNetUp']
+        self.backbone = 'ResNetUp' # ['AlexNet', 'VGG', 'ResNetUp']
         if self.backbone == 'AlexNet':
             self.backbone_feature_dim = 4096
         if self.backbone == 'VGG':
@@ -22,18 +22,18 @@ class Config:
         self.num_epochs = 1000
         self.validation_term = 1
         self.variational_beta = 10
-        self.learning_rate = 2e-4
+        self.learning_rate = 5e-5
         self.adam_beta1 = 0.5
         self.adam_beta2 = 0.999
         self.weight_decay = 2e-5
         self.CLIP = 1
-        self.batch_size = 16
+        self.batch_size = 64
         
         self.pck_threshold = 0.2
 
         self.backbone_freeze = False
 
-        self.checkpoint_dir = 'checkpoints/experiment31'
+        self.checkpoint_dir = 'checkpoints/experiment32'
         if not os.path.exists('checkpoints'):
             os.mkdir('checkpoints')
         if not os.path.exists(self.checkpoint_dir):
