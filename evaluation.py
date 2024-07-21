@@ -10,18 +10,28 @@ from data_loader import SitcomPoseDataset
 from model import VariationalAutoencoder, PoseClassifier
 from train_vae import generate_pose, cal_MSE, cal_PCK
 
-device = 'cpu'
+device = 'cuda:0'
 use_classifier = True
 use_encoder = False
-classifier_model_path = 'checkpoints/experiment22/model_81_1720_1720.pt'
-vae_model_path = 'checkpoints/experiment22/model_81_1720_1720.pt'
+
+# k=30
+classifier_model_path = 'checkpoints/experiment31/classifier_sota.pt'
+vae_model_path = 'checkpoints/experiment31/model_70_813_706.pt'
+
+# k=14
+# classifier_model_path = 'checkpoints/experiment33/model_4_3_[0.14418603479862213, 0.2643410861492157, 0.3852713108062744, 0.5023255348205566, 0.593281626701355].pt'
+# vae_model_path = 'checkpoints/experiment33/model_41_959_736.pt'
+
+# k=14 (filtered)
+# classifier_model_path = 'checkpoints/experiment28/model_46_6_[0.1723514199256897, 0.3007751703262329, 0.41111108660697937, 0.5054263472557068, 0.5813953280448914].pt'
+# vae_model_path = 'checkpoints/experiment28/model_245_2086_2084.pt'
 
 cfg = Config()
-model = VariationalAutoencoder(cfg)
+model = VariationalAutoencoder(cfg).to(device)
 model.load_state_dict(torch.load(vae_model_path, map_location=device))
 
 if use_classifier:
-    classifer = PoseClassifier(cfg)
+    classifer = PoseClassifier(cfg).to(device)
     classifer.load_state_dict(torch.load(classifier_model_path, map_location=device))
     classifer.eval()
 
@@ -58,7 +68,7 @@ with torch.no_grad():
         img, img_crop, img_zoom, one_hot_pose_vector, scale_deformation, pose_keypoints, image_size, target_point = batch
 
         if use_classifier:
-            pose_prob = classifer(img, img_crop, img_zoom)
+            pose_prob = classifer(img.to(device), img_crop.to(device), img_zoom.to(device))
             pose_cluster = torch.argmax(pose_prob, dim=1)
             one_hot_pose_vector = torch.nn.functional.one_hot(pose_cluster, one_hot_pose_vector.size(1))
             one_hot_pose_vector = torch.tensor(one_hot_pose_vector, dtype=torch.float32)

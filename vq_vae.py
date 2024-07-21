@@ -144,6 +144,43 @@ class Decoder(nn.Module):
         x = self.fc6(x)
 
         return x
+    
+class VectorQuantizer(nn.Module):
+    def __init__(self, num_embeddings, embedding_dim, commitment_cost):
+        super(VectorQuantizer, self).__init__()
+        
+        self._embedding_dim = embedding_dim
+        self._num_embeddings = num_embeddings
+        
+        self._embedding = nn.Embedding(self._num_embeddings, self._embedding_dim)
+        self._embedding.weight.data.uniform_(-1/self._num_embeddings, 1/self._num_embeddings)
+        # self._embedding.weight.data.normal_()
+        self._commitment_cost = commitment_cost
+
+    def forward(self, inputs):
+        # Calculate distances
+        distances = (torch.sum(inputs**2, dim=1, keepdim=True) 
+                    + torch.sum(self._embedding.weight**2, dim=1)
+                    - 2 * torch.matmul(inputs, self._embedding.weight.t()))
+
+        # Encoding
+        encoding_indices = torch.argmin(distances, dim=1).unsqueeze(1)
+        encodings = torch.zeros(encoding_indices.shape[0], self._num_embeddings, device=inputs.device)
+        encodings.scatter_(1, encoding_indices, 1)
+
+        # Quantize
+        quantized = torch.matmul(encodings, self._embedding.weight)
+        
+        # Loss
+        e_latent_loss = F.mse_loss(quantized.detach(), inputs)
+        q_latent_loss = F.mse_loss(quantized, inputs.detach())
+        loss = q_latent_loss + self._commitment_cost * e_latent_loss
+        
+        quantized = inputs + (quantized - inputs).detach()
+        avg_probs = torch.mean(encodings, dim=0)
+        perplexity = torch.exp(-torch.sum(avg_probs * torch.log(avg_probs + 1e-10)))
+        
+        return loss, quantized, perplexity, encodings
 
 class VectorQuantizerEMA(nn.Module):
     def __init__(self, num_embeddings, embedding_dim, commitment_cost, decay=0.0, epsilon=1e-5):
@@ -212,11 +249,14 @@ class VQ_VAE(nn.Module):
         self.condition_encoder = ConditionEncoder(cfg)
         self.encoder = Encoder(cfg, self.condition_encoder)
         self.decoder = Decoder(cfg, self.condition_encoder)
-        self.vq = VectorQuantizerEMA(cfg.num_embeddings, cfg.latent_dim, cfg.commitment_cost, cfg.decay)
+        if cfg.use_ema:
+            self.vq = VectorQuantizerEMA(cfg.num_embeddings, cfg.latent_dim, cfg.commitment_cost, cfg.decay)
+        else:
+            self.vq = VectorQuantizer(cfg.num_embeddings, cfg.latent_dim, cfg.commitment_cost)
 
     def forward(self, x, pose, img, img_crop, img_zoom):
         latent = self.encoder(x, pose, img, img_crop, img_zoom)
-        loss, quantized, perplexity, _ = self.vq(latent)
+        loss, quantized, perplexity, encodings = self.vq(latent)
         x_recon = self.decoder(quantized, pose, img, img_crop, img_zoom)
         
         return loss, x_recon, perplexity
@@ -232,13 +272,13 @@ class VQ_VAE(nn.Module):
 if __name__ == '__main__':
     cfg = Config()
     vq_vae = VQ_VAE(cfg)
-    batch_size = 2
+    batch_size = 10
     x = torch.randn((batch_size, cfg.sd_dim))
     pose = torch.randn((batch_size, cfg.pose_dim))
     img1 = torch.randn((batch_size, 3, 224, 224))
     img2 = torch.randn((batch_size, 3, 224, 224))
     img3 = torch.randn((batch_size, 3, 224, 224))
-    vq_vae.train()
+    # vq_vae.load_state_dict(torch.load('checkpoints/experiment50/model_5_2061_2061.pt'))
     loss, x_recon, perplexity = vq_vae(x, pose, img1, img2, img3)
     print(perplexity)
     print("===VQ_VAE OUTPUT===")

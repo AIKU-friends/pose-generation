@@ -12,7 +12,7 @@ from config import Config
 from data_loader import SitcomPoseDataset
 from vq_vae import VQ_VAE
 
-device = 'cuda:0'
+device = 'cuda:1'
 
 def get_lr(opt):
     for param_group in opt.param_groups:
@@ -31,7 +31,8 @@ def train_epoch(epoch, model, criterion, optimizer, lr_scheduler, train_dataload
 
     losses = []
     perplexity_list = []
-
+    vq_loss_term = Config().vq_loss_term
+    recon_loss_term = Config().recon_loss_term
     model.train()
 
     for i, batch in enumerate(train_dataloader):
@@ -45,7 +46,7 @@ def train_epoch(epoch, model, criterion, optimizer, lr_scheduler, train_dataload
         # compute loss using loss function
         recon_loss = criterion(scale_deformation_recon.to(device), scale_deformation.to(device))
 
-        loss = recon_loss + vq_loss
+        loss = recon_loss_term * recon_loss + vq_loss_term * vq_loss
 
         loss_val = loss.item()
         losses.append(loss_val)
@@ -101,7 +102,7 @@ def eval_epoch(model, dataloader, criterion, cluster_keypoints_list, pck_thresho
             mse_list.append(mse)
             pck_list.append(pck)
 
-            scale_deformation_recon = model.inference(one_hot_pose_vector, img, img_crop, img_zoom)
+            scale_deformation_recon = model.inference(one_hot_pose_vector.to(device), img.to(device), img_crop.to(device), img_zoom.to(device))
 
             generated_pose = generate_pose(base_pose, scale_deformation_recon[:, :2].to('cpu'), scale_deformation_recon[:, 2:].to('cpu'), target_point)
             mse = cal_MSE(generated_pose, pose_keypoints)
@@ -162,7 +163,7 @@ def train():
 
         # validation step
         if num_epochs % cfg.validation_term == 0 and num_epochs != 0:
-            valid_loss, mse_loss, mse, pck, mse_l, pck_l = eval_epoch(model, test_loader, criterion, cluster_keypoints_list, cfg.pck_threshold, cfg.latent_dim)
+            valid_loss, mse_loss, mse, pck, mse_l, pck_l = eval_epoch(model, test_loader, criterion, cluster_keypoints_list, cfg.pck_threshold)
             wandb.log({"Validation Loss": valid_loss, "MSE Loss": mse_loss, "MSE": mse, f"PCK@{cfg.pck_threshold}": pck, "MSE_Latent": mse_l, f"PCK@{cfg.pck_threshold}_Latent": pck_l})
             print(f'Validation Loss: {valid_loss:.3f}, MSE Loss: {mse_loss:.3f}, MSE: {mse:.3f}, PCK@{cfg.pck_threshold}: {pck:.3f}, MSE_Latent: {mse_l:.3f}, PCK@{cfg.pck_threshold}_Latent: {pck_l:.3f}')
 
@@ -204,4 +205,6 @@ if __name__ == '__main__':
         project="AIKU-VQ_VAE",
         config=experiment_config.__dict__
     )
+    wandb.run.name = experiment_config.checkpoint_dir.split('/')[-1]
+    wandb.run.save()
     train()

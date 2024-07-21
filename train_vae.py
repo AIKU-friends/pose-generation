@@ -17,6 +17,11 @@ device = 'cuda:0'
 def get_lr(opt):
     for param_group in opt.param_groups:
         return param_group['lr']
+    
+def kl_annealing(epoch):
+    max_beta = Config().variational_beta
+    max_epoch = 100
+    return (epoch / max_epoch) * max_beta
 
 def train_epoch(epoch, model, criterion, optimizer, lr_scheduler, train_dataloader, clip):
     ## args
@@ -35,7 +40,7 @@ def train_epoch(epoch, model, criterion, optimizer, lr_scheduler, train_dataload
         scale_deformation_recon, latent_mu, latent_logvar = model(scale_deformation.to(device), one_hot_pose_vector.to(device), img.to(device), img_crop.to(device), img_zoom.to(device))
 
         # compute loss using loss function
-        loss, _ = criterion(scale_deformation_recon.to(device), scale_deformation.to(device), latent_mu.to(device), latent_logvar.to(device))
+        loss, _ = criterion(scale_deformation_recon.to(device), scale_deformation.to(device), latent_mu.to(device), latent_logvar.to(device), kl_annealing(epoch))
 
         loss_val = loss.item()
         losses.append(loss_val)
@@ -108,11 +113,11 @@ def train():
     model = VariationalAutoencoder(cfg).to(device)
     # model.load_state_dict(torch.load('checkpoints/experiment12/model_63_1929_1433.pt'))
 
-    def vae_loss(recon_x, x, mu, logvar):
+    def vae_loss(recon_x, x, mu, logvar, variatoinal_beta=cfg.variational_beta):
 
         recon_loss = F.mse_loss(recon_x.view(-1, cfg.sd_dim), x.view(-1, cfg.sd_dim), reduction='mean')
         kldivergence = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
-        return recon_loss + cfg.variational_beta * kldivergence, recon_loss
+        return recon_loss + variatoinal_beta * kldivergence, recon_loss
 
     criterion = vae_loss
     optimizer = torch.optim.Adam(params=model.parameters(), lr=cfg.learning_rate, betas=(cfg.adam_beta1, cfg.adam_beta2), weight_decay=cfg.weight_decay)
@@ -201,4 +206,6 @@ if __name__ == '__main__':
         project="AIKU-VAE2",
         config=experiment_config.__dict__
     )
+    wandb.run.name = experiment_config.checkpoint_dir.split('/')[-1]
+    wandb.run.save()
     train()

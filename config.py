@@ -25,14 +25,17 @@ class Config:
         self.learning_rate = 2e-4
         self.adam_beta1 = 0.5
         self.adam_beta2 = 0.999
-        self.weight_decay = 2e-5
+        self.weight_decay = 1e-4
         self.CLIP = 1
         self.batch_size = 16
 
         # VQ-VAE
-        self.num_embeddings = 512
+        self.num_embeddings = 16
         self.commitment_cost = 0.25
         self.decay = 0.99
+        self.use_ema = True
+        self.vq_loss_term = 5
+        self.recon_loss_term = 1
 
         self.kl_annealing_policy = 'linear'
         
@@ -40,7 +43,7 @@ class Config:
 
         self.backbone_freeze = False
 
-        self.checkpoint_dir = 'checkpoints/experiment35'
+        self.checkpoint_dir = 'checkpoints/experiment62'
         if not os.path.exists('checkpoints'):
             os.mkdir('checkpoints')
         if not os.path.exists(self.checkpoint_dir):

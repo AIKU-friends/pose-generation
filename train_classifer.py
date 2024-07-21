@@ -164,4 +164,6 @@ if __name__ == '__main__':
         project="AIKU-classifier",
         config=experiment_config.__dict__
     )
+    wandb.run.name = experiment_config.checkpoint_dir.split('/')[-1]
+    wandb.run.save()
     train()
